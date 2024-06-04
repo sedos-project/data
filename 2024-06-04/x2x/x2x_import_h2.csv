@@ -1,0 +1,11 @@
+"id","version","csv_name","year","carrier","sector","category","amount","region","marginal_cost"
+1,"v3","x2x_import_h2.csv",2021,"h2","x2x","import",1000,"De",10
+2,"v3","x2x_import_h2.csv",2024,"h2","x2x","import",1000,"De",20
+3,"v3","x2x_import_h2.csv",2027,"h2","x2x","import",1000,"De",30
+4,"v3","x2x_import_h2.csv",2030,"h2","x2x","import",1000,"De",40
+5,"v3","x2x_import_h2.csv",2035,"h2","x2x","import",1000,"De",50
+6,"v3","x2x_import_h2.csv",2040,"h2","x2x","import",1000,"De",60
+7,"v3","x2x_import_h2.csv",2045,"h2","x2x","import",1000,"De",70
+8,"v3","x2x_import_h2.csv",2050,"h2","x2x","import",1000,"De",80
+9,"v3","x2x_import_h2.csv",2060,"h2","x2x","import",1000,"De",90
+10,"v3","x2x_import_h2.csv",2070,"h2","x2x","import",1000,"De",100

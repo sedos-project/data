@@ -1,0 +1,2 @@
+"id","region","year","type","ceff_spaceheat","ceff_waterheat","share_fx","stock","lifetime","availability","version","source","method"
+1,"DE",2010,"hea_hh_heater_boil_dual_biomass",0.7,0.6,0.76,0.1,20,0.25,"v1","",""

@@ -1,0 +1,9 @@
+"id","region","year","type","techcapunit","techactunit","availability","pro_efficiency","fix_cost","inv_cost","lifetime"
+0,"germany",2015,"hea_hh_heater_hp_air_1","GW","PJ",0.99,0.688,13.767,550.697,20
+1,"germany",2020,"hea_hh_heater_hp_air_1","GW","PJ",0.99,0.688,13.951,558.045,20
+2,"germany",2025,"hea_hh_heater_hp_air_1","GW","PJ",0.99,0.688,13.886,555.45,20
+3,"germany",2030,"hea_hh_heater_hp_air_1","GW","PJ",0.99,0.688,14.623,584.933,20
+4,"germany",2035,"hea_hh_heater_hp_air_1","GW","PJ",0.99,0.688,15.08,603.206,20
+5,"germany",2040,"hea_hh_heater_hp_air_1","GW","PJ",0.99,0.688,15.711,628.422,20
+6,"germany",2045,"hea_hh_heater_hp_air_1","GW","PJ",0.99,0.688,16.554,662.164,20
+7,"germany",2050,"hea_hh_heater_hp_air_1","GW","PJ",0.99,0.688,16.935,677.418,20
