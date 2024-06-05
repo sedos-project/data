@@ -1,5 +1,5 @@
 "id","region","year","type","conversion_factor_sec_elec","conversion_factor_iip_elec","bandwidth_type","version","method","source","comment"
-1,"DE",2021,"helper_ind_pow_grid_elec",1.0,1.0,"{}","v1","{}","{}","{}"
+1,"DE",2021,"helper_ind_pow_grid_elec",1.0,1.0,"{}",srd_range_draft,"{}","{}","{}"
 2,"DE",2024,"helper_ind_pow_grid_elec",1.0,1.0,"{}","v1","{}","{}","{}"
 3,"DE",2027,"helper_ind_pow_grid_elec",1.0,1.0,"{}","v1","{}","{}","{}"
 4,"DE",2030,"helper_ind_pow_grid_elec",1.0,1.0,"{}","v1","{}","{}","{}"
