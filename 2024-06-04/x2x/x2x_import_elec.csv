@@ -1,5 +1,5 @@
 "id","version","csv_name","year","carrier","sector","category","amount","region","marginal_cost"
-1,"v3","x2x_import_elec.csv",2021,"electricity","x2x","import",1000,"De",10
+1,"v3","x2x_import_elec.csv",2021,"electricity","x2x","import",1000,DE,10
 2,"v3","x2x_import_elec.csv",2024,"electricity","x2x","import",1000,"De",20
 3,"v3","x2x_import_elec.csv",2027,"electricity","x2x","import",1000,"De",30
 4,"v3","x2x_import_elec.csv",2030,"electricity","x2x","import",1000,"De",40
