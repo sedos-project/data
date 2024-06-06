@@ -1,5 +1,5 @@
 "id","version","csv_name","year","carrier","sector","category","amount","region","marginal_cost"
-1,"v3","x2x_import_coke_oven_gas.csv",2021,"coke_oven_gas","x2x","import",10000,"De",10
+1,"v3","x2x_import_coke_oven_gas.csv",2021,"coke_oven_gas","x2x","import",10000,DE,10
 2,"v3","x2x_import_coke_oven_gas.csv",2024,"coke_oven_gas","x2x","import",10000,"De",20
 3,"v3","x2x_import_coke_oven_gas.csv",2027,"coke_oven_gas","x2x","import",10000,"De",30
 4,"v3","x2x_import_coke_oven_gas.csv",2030,"coke_oven_gas","x2x","import",10000,"De",40
