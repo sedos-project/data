@@ -1,101 +1,52 @@
+'''
+Script to analyse SEDOS data tables for formal correctness.
+'''
+
 import pandas as pd
-import os
 import pathlib
 import glob
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 
-def analyse_col_values(table_name: str, df_table: object, value_in_col: dict, value_not_in_col: dict ) -> None:
 
-    for column, col_value in value_in_col.items():
-        missing_col_set = set()
-        if column in df_table.columns:
-            for item in df_table[column]:
-                if col_value in str(item):
-                    found_value = item
-                    res_value_in_col[f"{table_name}"] = found_value
-        else:
-            missing_col_set.add(column)
-            if missing_col_set:
-                table_missing_cols[table_name] = missing_col_set
+# define sector to analyse
+sector = "x2x"
 
+# define values to check if/if not in column
+value_in_col = {"year": "2020"}
+value_not_in_col = {"version": "srd_range_draft"}
 
-    for column, col_value in value_not_in_col.items():
-        if column in df_table.columns:
-            set_wrong_values_in_col = set()
-            for item in df_table[column]:
-                if pd.notna(item) and col_value not in str(item):
-                    set_wrong_values_in_col.add(item)
+res_value_in_col = {}
+res_value_not_in_col = {}
+table_missing_cols = {}
+missing_references = {}
 
-            # check if set is empty
-            if set_wrong_values_in_col:
-                res_value_not_in_col[f"{table_name}"] = set_wrong_values_in_col
+# constants
 
-def check_global_reference_cols(table_name: str, df_table: object) -> None:
-    # extract set of user cols
-    user_cols = [col for col in df_table.columns if col not in OED_COLS]
+path = fr"2024-06-04/{sector}/"
 
-    # New DataFrame with the selected columns
-    user_df = df_table[user_cols]
-
-    # Extract columns that contain one of the search strings and are not in OED_COLS
-    miss_ref = {}
-    for user_col in user_cols:
-        #print(user_col)
-        for value in user_df[user_col].astype(str).unique():
-            if "[" not in value and "." in value:
-                global_table_ref, ref_col = value.split(".")
-
-                # Check if ref_col is not in global_cols and is not a number
-                if ref_col not in global_cols and not ref_col.isdigit():
-                    miss_ref[user_col] = f"{global_table_ref}.{ref_col}"
-
-    if miss_ref:
-        missing_references[table_name] = miss_ref
+OED_COLS = {
+    "id",
+    "region",
+    "year",
+    "type",
+    "bandwidth_type",
+    "version",
+    "method",
+    "source",
+    "comment",
+    "timeindex_start",
+    "timeindex_stop",
+    "timeindex_resolution"
+}
 
 
-
-def return_csv_table_paths(path: pathlib.Path) -> list:
-    return glob.glob(f"{path}*.csv")
-
+global_tables = [f"{sector}_timeseries", f"{sector}_scalars", "global_timeseries", "global_scalars",
+               "global_emission_factors"]
 
 
-if __name__ == "__main__":
-
-    sector = "x2x"
-    path = fr"2024-06-04/{sector}/"
-
-    OED_COLS = {
-        "id",
-        "region",
-        "year",
-        "type",
-        "bandwidth_type",
-        "version",
-        "method",
-        "source",
-        "comment",
-        "timeindex_start",
-        "timeindex_stop",
-        "timeindex_resolution"
-    }
-
-
-    global_tables = [f"{sector}_timeseries", f"{sector}_scalars", "global_timeseries", "global_scalars",
-                   "global_emission_factors"]
-
-
-
-    res_value_in_col = {}
-    res_value_not_in_col = {}
-    table_missing_cols = {}
-    missing_references = {}
-
-    value_in_col = {"year": "2020"}
-    value_not_in_col = {"version": "srd_range_draft"}
-
-    global_emission_cols = [
+global_emission_cols = [
     "raw_hard_coal_power_stations_industry",
     "hard_coal_briquettes",
     "hard_coal_coke",
@@ -166,13 +117,117 @@ if __name__ == "__main__":
     "biodiesel"
 ]
 
-    global_scalar_cols = ["wacc"]
-    global_timeseries_cols = []
+global_scalar_cols = ["wacc"]
+global_timeseries_cols = [] # does not exist yet
+sector_timeseries_cols = ["capacity_tra_connection_flex_lcar","capacity_tra_connection_flex_mcar",
+                     "capacity_tra_connection_flex_hcar","capacity_tra_connection_inflex_lcar","capacity_tra_connection_inflex_mcar","capacity_tra_connection_inflex_hcar","exo_pkm_road_lcar","exo_pkm_road_mcar","exo_pkm_road_hcar","sto_max_lcar","sto_max_mcar","sto_max_hcar","sto_min_lcar","sto_min_mcar","sto_min_hcar"]
 
-    sector_timeseries_cols = ["capacity_tra_connection_flex_lcar","capacity_tra_connection_flex_mcar",
-                         "capacity_tra_connection_flex_hcar","capacity_tra_connection_inflex_lcar","capacity_tra_connection_inflex_mcar","capacity_tra_connection_inflex_hcar","exo_pkm_road_lcar","exo_pkm_road_mcar","exo_pkm_road_hcar","sto_max_lcar","sto_max_mcar","sto_max_hcar","sto_min_lcar","sto_min_mcar","sto_min_hcar"]
+global_cols = global_emission_cols + global_scalar_cols + global_timeseries_cols
 
-    global_cols = global_emission_cols + global_scalar_cols + global_timeseries_cols
+
+
+def analyse_col_values(table_name: str, df_table: pd.DataFrame, value_in_col: dict, value_not_in_col: dict ) -> None:
+    '''
+    Find missing and incorrect column values in tables and log them.
+
+    Parameters
+    ----------
+    table_name: str
+        Table name
+    df_table: pandas.DataFrame
+        Data to check
+    value_in_col: dict
+        Columns and values to check
+    value_not_in_col: dict
+        Columns and values to check
+    Returns
+    -------
+    None
+    '''
+    # check if value is in column - log if it is
+    for column, col_value in value_in_col.items():
+        missing_col_set = set()
+        if column in df_table.columns:
+            for item in df_table[column]:
+                if col_value in str(item):
+                    found_value = item
+                    res_value_in_col[f"{table_name}"] = found_value
+        else:
+            missing_col_set.add(column)
+            if missing_col_set:
+                table_missing_cols[table_name] = missing_col_set
+
+    # check if value is missing in column - log if it is
+    for column, col_value in value_not_in_col.items():
+        if column in df_table.columns:
+            set_wrong_values_in_col = set()
+            for item in df_table[column]:
+                if pd.notna(item) and col_value not in str(item):
+                    set_wrong_values_in_col.add(item)
+
+            # check if set is empty
+            if set_wrong_values_in_col:
+                res_value_not_in_col[f"{table_name}"] = set_wrong_values_in_col
+
+    return None
+
+def check_global_reference_cols(table_name: str, df_table: object) -> None:
+    '''
+    Find foreign-key table references where the referenced column is missing in reference table.
+
+    Parameters
+    ----------
+    table_name: str
+        Table name
+    df_table: pandas.DataFrame
+        Data to check
+
+    Returns
+    -------
+    None
+    '''
+    # extract set of user cols
+    user_cols = [col for col in df_table.columns if col not in OED_COLS]
+
+    # New DataFrame with the selected columns
+    user_df = df_table[user_cols]
+
+    # Extract columns that contain one of the search strings and are not in OED_COLS
+    miss_ref = {}
+    for user_col in user_cols:
+        #print(user_col)
+        for value in user_df[user_col].astype(str).unique():
+            if "[" not in value and "." in value:
+                global_table_ref, ref_col = value.split(".")
+
+                # Check if ref_col is not in global_cols and is not a number
+                if ref_col not in global_cols and not ref_col.isdigit():
+                    miss_ref[user_col] = f"{global_table_ref}.{ref_col}"
+
+    if miss_ref:
+        missing_references[table_name] = miss_ref
+
+    return None
+
+
+
+def return_csv_table_paths(path: pathlib.Path) -> list:
+    '''
+
+    Parameters
+    ----------
+    path: str
+        Path to files
+
+    Returns
+    -------
+    List of file paths
+    '''
+    return glob.glob(f"{path}*.csv")
+
+
+
+if __name__ == "__main__":
 
     tables_paths = return_csv_table_paths(path)
 
