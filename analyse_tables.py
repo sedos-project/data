@@ -10,21 +10,30 @@ pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 
 
+class EmptyColumnError(Exception):
+    pass
+
+
 # define sector to analyse
-sector = "x2x"
+sector = "tra"
 
 # define values to check if/if not in column
-value_in_col = {"year": "2020"}
-value_not_in_col = {"version": "srd_range_draft"}
-
-res_value_in_col = {}
-res_value_not_in_col = {}
-table_missing_cols = {}
-missing_references = {}
+value_in_col = {"type": "1", "year": "2020", "year": "2021"}
+value_not_in_col = {"version": "srd_range_draft", "source": "1"}
 
 # constants
 
 path = fr"2024-06-04/{sector}/"
+excel_path = fr'review/{sector}_review_results.xlsx'
+bwshare_path = fr"SEDOS_Modellstruktur.xlsx"
+
+processes_bwshare = pd.read_excel(io=bwshare_path, sheet_name="Process_Set", usecols=["process"])
+processes_bwshare = set(processes_bwshare["process"].dropna())
+
+parameter_bwshare = pd.read_excel(io=bwshare_path, sheet_name="Parameter_Set",
+                                  usecols=["SEDOS_name_long", "static_parameter"])
+nomenclature_static = set(parameter_bwshare.loc[parameter_bwshare["static_parameter"] == 1, "SEDOS_name_long"])
+nomenclature_variable = set(parameter_bwshare.loc[parameter_bwshare["static_parameter"] == 0, "SEDOS_name_long"])
 
 OED_COLS = {
     "id",
@@ -41,10 +50,8 @@ OED_COLS = {
     "timeindex_resolution"
 }
 
-
 global_tables = [f"{sector}_timeseries", f"{sector}_scalars", "global_timeseries", "global_scalars",
-               "global_emission_factors"]
-
+                 "global_emission_factors"]
 
 global_emission_cols = [
     "raw_hard_coal_power_stations_industry",
@@ -118,15 +125,17 @@ global_emission_cols = [
 ]
 
 global_scalar_cols = ["wacc"]
-global_timeseries_cols = [] # does not exist yet
-sector_timeseries_cols = ["capacity_tra_connection_flex_lcar","capacity_tra_connection_flex_mcar",
-                     "capacity_tra_connection_flex_hcar","capacity_tra_connection_inflex_lcar","capacity_tra_connection_inflex_mcar","capacity_tra_connection_inflex_hcar","exo_pkm_road_lcar","exo_pkm_road_mcar","exo_pkm_road_hcar","sto_max_lcar","sto_max_mcar","sto_max_hcar","sto_min_lcar","sto_min_mcar","sto_min_hcar"]
+global_timeseries_cols = []  # does not exist yet
+sector_timeseries_cols = ["capacity_tra_connection_flex_lcar", "capacity_tra_connection_flex_mcar",
+                          "capacity_tra_connection_flex_hcar", "capacity_tra_connection_inflex_lcar",
+                          "capacity_tra_connection_inflex_mcar", "capacity_tra_connection_inflex_hcar",
+                          "exo_pkm_road_lcar", "exo_pkm_road_mcar", "exo_pkm_road_hcar", "sto_max_lcar",
+                          "sto_max_mcar", "sto_max_hcar", "sto_min_lcar", "sto_min_mcar", "sto_min_hcar"]
 
 global_cols = global_emission_cols + global_scalar_cols + global_timeseries_cols
 
 
-
-def analyse_col_values(table_name: str, df_table: pd.DataFrame, value_in_col: dict, value_not_in_col: dict ) -> None:
+def find_wanted_values_in_col(table_name: str, df_table: pd.DataFrame, value_in_col: dict) -> None:
     '''
     Find missing and incorrect column values in tables and log them.
 
@@ -144,32 +153,64 @@ def analyse_col_values(table_name: str, df_table: pd.DataFrame, value_in_col: di
     -------
     None
     '''
+
+    res = pd.DataFrame()
+    table_missing_cols = pd.DataFrame()
+    res_value_in_col = pd.DataFrame()
+    res_value_not_in_col = pd.DataFrame()
+
     # check if value is in column - log if it is
     for column, col_value in value_in_col.items():
-        missing_col_set = set()
         if column in df_table.columns:
             for item in df_table[column]:
                 if col_value in str(item):
                     found_value = item
                     res_value_in_col[f"{table_name}"] = found_value
+                    res = pd.concat([res, pd.DataFrame([{'table_name': table_name, 'searched_column': column,
+                                                         'value_expected_to_be_in_col': col_value,
+                                                         'value_found_in_col': found_value}])], ignore_index=True)
         else:
-            missing_col_set.add(column)
-            if missing_col_set:
-                table_missing_cols[table_name] = missing_col_set
+            res = pd.concat([res, pd.DataFrame([{'table_name': table_name, 'searched_column': column,
+                                                 'missing_column': column}])], ignore_index=True)
 
+    return res
+
+
+def find_unwanted_values_in_col(table_name: str, df_table: pd.DataFrame, res_value_not_in_col: dict):
+    '''
+
+    Parameters
+    ----------
+    table_name
+    df_table
+    res_value_not_in_col
+
+    Returns
+    -------
+
+    '''
     # check if value is missing in column - log if it is
     for column, col_value in value_not_in_col.items():
         if column in df_table.columns:
             set_wrong_values_in_col = set()
             for item in df_table[column]:
-                if pd.notna(item) and col_value not in str(item):
-                    set_wrong_values_in_col.add(item)
+                if item not in set_wrong_values_in_col:
+                    if pd.notna(item) and col_value not in str(item):
+                        set_wrong_values_in_col.add(item)
+                        res = pd.concat([res, pd.DataFrame([{'table_name': table_name, 'searched_column': column,
+                                                             'value_expected_to_be_in_col': col_value,
+                                                             'value_found_in_col': found_value}])], ignore_index=True)
 
             # check if set is empty
             if set_wrong_values_in_col:
-                res_value_not_in_col[f"{table_name}"] = set_wrong_values_in_col
+                res_value_not_in_col[f"{table_name}|{column}|{col_value}"] = set_wrong_values_in_col
 
-    return None
+    return res
+
+
+def get_user_cols(df_table):
+    return [col for col in df_table.columns if col not in OED_COLS]
+
 
 def check_global_reference_cols(table_name: str, df_table: object) -> None:
     '''
@@ -184,31 +225,111 @@ def check_global_reference_cols(table_name: str, df_table: object) -> None:
 
     Returns
     -------
-    None
+    miss_ref: pandas.DataFrame
+        Data with missing columns in reference table
     '''
+    miss_ref = pd.DataFrame()
     # extract set of user cols
-    user_cols = [col for col in df_table.columns if col not in OED_COLS]
+    user_cols = get_user_cols(df_table)
 
     # New DataFrame with the selected columns
     user_df = df_table[user_cols]
 
     # Extract columns that contain one of the search strings and are not in OED_COLS
-    miss_ref = {}
     for user_col in user_cols:
-        #print(user_col)
         for value in user_df[user_col].astype(str).unique():
             if "[" not in value and "." in value:
                 global_table_ref, ref_col = value.split(".")
 
                 # Check if ref_col is not in global_cols and is not a number
                 if ref_col not in global_cols and not ref_col.isdigit():
-                    miss_ref[user_col] = f"{global_table_ref}.{ref_col}"
+                    miss_ref = pd.concat([miss_ref, pd.DataFrame([{'table_name': table_name, 'column': user_col,
+                                                                   'global_table_ref': global_table_ref,
+                                                                   'ref_col': ref_col}])], ignore_index=True)
 
-    if miss_ref:
-        missing_references[table_name] = miss_ref
+    return miss_ref
+
+
+def check_if_process_name_is_in_set_bwshare_process_names(table_name, df_table):
+    '''
+    Returns missing processes
+
+    Parameters
+    ----------
+    table_name: str
+        Table name
+    df_table: pandas.DataFrame
+        Data to check
+
+    Returns
+    -------
+    missing_processes: pandas.DataFrame
+        Dataframe of missing processes
+    '''
+    missing_processes = pd.DataFrame()
+    if "type" not in df_table.columns and table_name not in processes_bwshare:
+        missing_processes = pd.concat([missing_processes, pd.DataFrame([{'table_name': table_name}])],
+                                      ignore_index=True)
+        return missing_processes
+
+    if df_table["type"].isna().all():
+        missing_processes = pd.concat([missing_processes, pd.DataFrame([{'table_name': table_name,
+                                                                         'type_col_processes_on_oep_but_missing_in_bwshare':
+                                                                             "TYPE COLUMN MUST NOT BE EMPTY"}])],
+                                      ignore_index=True)
+
+    table_processes = set(df_table["type"].dropna())
+    is_subset = table_processes.issubset(processes_bwshare)
+    if not is_subset:
+        miss_pros = table_processes - processes_bwshare
+        missing_processes = pd.concat([missing_processes, pd.DataFrame([{'table_name': table_name,
+                                                                         'type_col_processes_on_oep_but_missing_in_bwshare':
+                                                                             miss_pros}])], ignore_index=True)
+        return missing_processes
 
     return None
 
+
+def check_if_column_name_is_in_set_bwshare_parameter_names(table_name, df_table):
+    '''
+    Returns missing parameters
+
+    Parameters
+    ----------
+    table_name: str
+        Table name
+    df_table: pandas.DataFrame
+        Data to check
+    Returns
+    -------
+    missing_parameters: pandas.DataFrame
+        Dataframe of missing parameters
+    '''
+    missing_parameters = pd.DataFrame()
+
+    # parameter check
+    table_parameters = set(get_user_cols(df_table))
+
+    prefixes_nomenclature_variable = [s.split('<')[0] for s in nomenclature_variable]
+    variable_parameters = {item for item in table_parameters if
+                           any(item.startswith(prefix) for prefix in prefixes_nomenclature_variable)}
+    static_parameters = {item for item in table_parameters if
+                         not any(item.startswith(prefix) for prefix in prefixes_nomenclature_variable)}
+
+    is_static = static_parameters.issubset(nomenclature_static)
+    is_variable = variable_parameters.issubset(nomenclature_variable)
+
+    static_params = None if is_static else static_parameters - nomenclature_static
+    variable_params = None if is_variable else variable_parameters - nomenclature_variable
+
+    missing_parameters = pd.concat([missing_parameters, pd.DataFrame([{'table_name': table_name,
+                                                                       'static_column_name_in_table_is_not_in_bwshare_parameter_set':
+                                                                           static_params,
+                                                                       'variable_column_name_in_table_is_not_in_bwshare_parameter_set | ATTENTION: so far just lists all static parameters and does not check if build logic is correct':
+                                                                           variable_params}])], ignore_index=True)
+
+
+    return missing_parameters
 
 
 def return_csv_table_paths(path: pathlib.Path) -> list:
@@ -226,8 +347,12 @@ def return_csv_table_paths(path: pathlib.Path) -> list:
     return glob.glob(f"{path}*.csv")
 
 
-
 if __name__ == "__main__":
+
+    df_wrong_col_values = pd.DataFrame()
+    df_missing_ref_table_columns = pd.DataFrame()
+    df_missing_proc = pd.DataFrame()
+    df_wrong_parameter_name = pd.DataFrame()
 
     tables_paths = return_csv_table_paths(path)
 
@@ -235,37 +360,29 @@ if __name__ == "__main__":
         table_name = table_path.split("\\")[1].split(".")[0]
         print(table_name)
         df_table = pd.read_csv(
-                filepath_or_buffer=table_path,
-                sep=",")
-        analyse_col_values(table_name, df_table, value_in_col, value_not_in_col)
-        check_global_reference_cols(table_name, df_table)
+            filepath_or_buffer=table_path,
+            sep=",")
 
+        # perform different tests
 
-    print(f"Number {sector} tables:", len(tables_paths))
-    print("Number of tables with res_value_in_col:", len(res_value_in_col), "res_value_in_col:",res_value_in_col)
-    print("res_value_not_in_col:",  res_value_not_in_col)
+        #df_wrong_col_values = pd.concat([df_wrong_col_values, find_wanted_values_in_col(table_name, df_table,
+        # value_in_col)], ignore_index=True)
 
+        df_missing_ref_table_columns = pd.concat([df_missing_ref_table_columns, check_global_reference_cols(
+            table_name, df_table)], ignore_index=True)
 
-    print("\nNumber tables with wrong version:", pd.DataFrame.from_dict(res_value_not_in_col, orient='index').shape[0])
-    print("\ndf:", pd.DataFrame.from_dict(res_value_not_in_col, orient='index'))
+        df_missing_proc = pd.concat([df_missing_proc, check_if_process_name_is_in_set_bwshare_process_names(
+            table_name, df_table)], ignore_index=True)
 
-    print("Number tables with wrong version:", pd.DataFrame.from_dict(res_value_not_in_col, orient='index').shape[0],"\nMissing cols", pd.DataFrame.from_dict(table_missing_cols, orient='index'))
+        df_wrong_parameter_name = pd.concat(
+            [df_wrong_parameter_name, check_if_column_name_is_in_set_bwshare_parameter_names(
+                table_name, df_table)], ignore_index=True)
 
-    print(missing_references)
+    # save test results to one excel in different sheets
 
-    # dicts to dfs
-    # Flatten the dictionary
-    flattened_data = []
-    for outer_key, inner_dict in missing_references.items():
-        for inner_key, value in inner_dict.items():
-            flattened_data.append({
-                'table': outer_key,
-                'column': inner_key,
-                'reference_table': value.split(".")[0] if "." in value else value,
-                'missing_col_in_reference_table': value.split(".")[1] if "." in value else value
-            })
+    dfs = {"wrong_values": df_wrong_col_values, "missing_refs": df_missing_ref_table_columns, "missing_processes":
+        df_missing_proc, "wrong_parameter_name": df_wrong_parameter_name}
 
-    # Convert to DataFrame
-    df = pd.DataFrame(flattened_data)
-    df.to_csv(f"{sector}_missing_refs.csv")
-
+    for title, df in dfs.items():
+        with pd.ExcelWriter(excel_path, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
+            df.to_excel(writer, sheet_name=title, index=False)
