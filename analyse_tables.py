@@ -14,8 +14,6 @@ class EmptyColumnError(Exception):
     pass
 
 
-# define sector to analyse
-sector = "tra"
 
 # define values to check if/if not in column
 value_in_col = {"type": "1", "year": "2020", "year": "2021"}
@@ -23,12 +21,16 @@ value_not_in_col = {"version": "srd_range_draft", "source": "1"}
 
 # constants
 
-path = fr"2024-06-04/{sector}/"
-excel_path = fr'review/{sector}_review_results.xlsx'
+
 bwshare_path = fr"SEDOS_Modellstruktur.xlsx"
 
 processes_bwshare = pd.read_excel(io=bwshare_path, sheet_name="Process_Set", usecols=["process"])
 processes_bwshare = set(processes_bwshare["process"].dropna())
+
+ag_processes_bwshare = pd.read_excel(io=bwshare_path, sheet_name="Aggregation_Mapping", usecols=["aggregation"])
+ag_processes_bwshare = set(ag_processes_bwshare["aggregation"].dropna())
+
+processes_bwshare = processes_bwshare.union(ag_processes_bwshare)
 
 parameter_bwshare = pd.read_excel(io=bwshare_path, sheet_name="Parameter_Set",
                                   usecols=["SEDOS_name_long", "static_parameter"])
@@ -50,8 +52,8 @@ OED_COLS = {
     "timeindex_resolution"
 }
 
-global_tables = [f"{sector}_timeseries", f"{sector}_scalars", "global_timeseries", "global_scalars",
-                 "global_emission_factors"]
+# global_tables = [f"{sector}_timeseries", f"{sector}_scalars", "global_timeseries", "global_scalars",
+#                  "global_emission_factors"]
 
 global_emission_cols = [
     "raw_hard_coal_power_stations_industry",
@@ -272,6 +274,9 @@ def check_if_process_name_is_in_set_bwshare_process_names(table_name, df_table):
                                       ignore_index=True)
         return missing_processes
 
+    if "type" not in df_table.columns:
+        return None
+
     if df_table["type"].isna().all():
         missing_processes = pd.concat([missing_processes, pd.DataFrame([{'table_name': table_name,
                                                                          'type_col_processes_on_oep_but_missing_in_bwshare':
@@ -325,7 +330,7 @@ def check_if_column_name_is_in_set_bwshare_parameter_names(table_name, df_table)
     missing_parameters = pd.concat([missing_parameters, pd.DataFrame([{'table_name': table_name,
                                                                        'static_column_name_in_table_is_not_in_bwshare_parameter_set':
                                                                            static_params,
-                                                                       'variable_column_name_in_table_is_not_in_bwshare_parameter_set | ATTENTION: so far just lists all static parameters and does not check if build logic is correct':
+                                                                       'variable_column_name_in_table_is_not_in_bwshare_parameter_set | ATTENTION: so far just lists all variable parameters and does not check if build logic is correct':
                                                                            variable_params}])], ignore_index=True)
 
 
@@ -349,40 +354,46 @@ def return_csv_table_paths(path: pathlib.Path) -> list:
 
 if __name__ == "__main__":
 
-    df_wrong_col_values = pd.DataFrame()
-    df_missing_ref_table_columns = pd.DataFrame()
-    df_missing_proc = pd.DataFrame()
-    df_wrong_parameter_name = pd.DataFrame()
+    sectors = ["pow","hea","x2x","ind","tra"]
 
-    tables_paths = return_csv_table_paths(path)
+    for sector in sectors:
 
-    for table_path in tables_paths:
-        table_name = table_path.split("\\")[1].split(".")[0]
-        print(table_name)
-        df_table = pd.read_csv(
-            filepath_or_buffer=table_path,
-            sep=",")
+        df_wrong_col_values = pd.DataFrame()
+        df_missing_ref_table_columns = pd.DataFrame()
+        df_missing_proc = pd.DataFrame()
+        df_wrong_parameter_name = pd.DataFrame()
 
-        # perform different tests
+        path = fr"2024-06-04/{sector}/"
+        excel_path = fr'review/{sector}_review_results.xlsx'
+        tables_paths = return_csv_table_paths(path)
 
-        #df_wrong_col_values = pd.concat([df_wrong_col_values, find_wanted_values_in_col(table_name, df_table,
-        # value_in_col)], ignore_index=True)
+        for table_path in tables_paths:
+            table_name = table_path.split("\\")[1].split(".")[0]
+            print(table_name)
+            df_table = pd.read_csv(
+                filepath_or_buffer=table_path,
+                sep=",")
 
-        df_missing_ref_table_columns = pd.concat([df_missing_ref_table_columns, check_global_reference_cols(
-            table_name, df_table)], ignore_index=True)
+            # perform different tests
 
-        df_missing_proc = pd.concat([df_missing_proc, check_if_process_name_is_in_set_bwshare_process_names(
-            table_name, df_table)], ignore_index=True)
+            #df_wrong_col_values = pd.concat([df_wrong_col_values, find_wanted_values_in_col(table_name, df_table,
+            # value_in_col)], ignore_index=True)
 
-        df_wrong_parameter_name = pd.concat(
-            [df_wrong_parameter_name, check_if_column_name_is_in_set_bwshare_parameter_names(
+            df_missing_ref_table_columns = pd.concat([df_missing_ref_table_columns, check_global_reference_cols(
                 table_name, df_table)], ignore_index=True)
 
-    # save test results to one excel in different sheets
+            df_missing_proc = pd.concat([df_missing_proc, check_if_process_name_is_in_set_bwshare_process_names(
+                table_name, df_table)], ignore_index=True)
 
-    dfs = {"wrong_values": df_wrong_col_values, "missing_refs": df_missing_ref_table_columns, "missing_processes":
-        df_missing_proc, "wrong_parameter_name": df_wrong_parameter_name}
+            df_wrong_parameter_name = pd.concat(
+                [df_wrong_parameter_name, check_if_column_name_is_in_set_bwshare_parameter_names(
+                    table_name, df_table)], ignore_index=True)
 
-    for title, df in dfs.items():
-        with pd.ExcelWriter(excel_path, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
-            df.to_excel(writer, sheet_name=title, index=False)
+        # save test results to one excel in different sheets
+
+        dfs = {"wrong_values": df_wrong_col_values, "missing_refs": df_missing_ref_table_columns, "missing_processes":
+            df_missing_proc, "wrong_parameter_name": df_wrong_parameter_name}
+
+        for title, df in dfs.items():
+            with pd.ExcelWriter(excel_path, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
+                df.to_excel(writer, sheet_name=title, index=False)
