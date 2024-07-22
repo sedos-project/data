@@ -17,6 +17,8 @@ class EmptyColumnError(Exception):
 # Centralized path definition
 BASE_PATH = r"C:\_prog\_code\SEDOS\data-review\2024-07-22"
 REVIEW_PATH = r"C:\_prog\_code\SEDOS\data-review"
+bwshare_path = fr"C:\_prog\_code\SEDOS\data-review\SEDOS_Modellstruktur.xlsx"
+
 
 # define values to check if/if not in column
 value_in_col = {"type": "1", "year": "2020", "year": "2021"}
@@ -25,7 +27,7 @@ value_not_in_col = {"version": "srd_range_draft", "source": "1"}
 # constants
 
 
-bwshare_path = fr"C:\_prog\_code\SEDOS\data-review\SEDOS_Modellstruktur.xlsx"
+
 
 processes_bwshare = pd.read_excel(io=bwshare_path, sheet_name="Process_Set", usecols=["process"])
 processes_bwshare = set(processes_bwshare["process"].dropna())
@@ -33,7 +35,10 @@ processes_bwshare = set(processes_bwshare["process"].dropna())
 ag_processes_bwshare = pd.read_excel(io=bwshare_path, sheet_name="Aggregation_Mapping", usecols=["aggregation"])
 ag_processes_bwshare = set(ag_processes_bwshare["aggregation"].dropna())
 
-processes_bwshare = processes_bwshare.union(ag_processes_bwshare)
+helpers_bwshare = pd.read_excel(io=bwshare_path, sheet_name="Helper_Set", usecols=["process"])
+helpers_bwshare = set(helpers_bwshare["process"].dropna())
+
+processes_bwshare = processes_bwshare.union(ag_processes_bwshare).union(helpers_bwshare)
 
 parameter_bwshare = pd.read_excel(io=bwshare_path, sheet_name="Parameter_Set",
                                   usecols=["SEDOS_name_long", "static_parameter"])
