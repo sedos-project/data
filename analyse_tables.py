@@ -63,6 +63,10 @@ OED_COLS = {
     "timeindex_resolution"
 }
 
+
+# status of global tables as of 2024-07-22
+global_scalar_cols = ["wacc"]
+global_timeseries_cols = []
 global_emission_cols = [
     "raw_hard_coal_power_stations_industry",
     "hard_coal_briquettes",
@@ -133,17 +137,6 @@ global_emission_cols = [
     "methanol",
     "biodiesel"
 ]
-
-global_scalar_cols = ["wacc"]
-global_timeseries_cols = []  # does not exist yet
-sector_timeseries_cols = ["capacity_tra_connection_flex_lcar", "capacity_tra_connection_flex_mcar",
-                          "capacity_tra_connection_flex_hcar", "capacity_tra_connection_inflex_lcar",
-                          "capacity_tra_connection_inflex_mcar", "capacity_tra_connection_inflex_hcar",
-                          "exo_pkm_road_lcar", "exo_pkm_road_mcar", "exo_pkm_road_hcar", "sto_max_lcar",
-                          "sto_max_mcar", "sto_max_hcar", "sto_min_lcar", "sto_min_mcar", "sto_min_hcar"]
-
-
-
 
 
 def find_wanted_values_in_col(table_name: str, df_table: pd.DataFrame, value_in_col: dict) -> None:
