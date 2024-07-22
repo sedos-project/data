@@ -1,6 +1,7 @@
 '''
 Script to analyse SEDOS data tables for formal correctness.
 '''
+import os
 
 import pandas as pd
 import pathlib
@@ -13,7 +14,9 @@ pd.set_option('display.max_columns', None)
 class EmptyColumnError(Exception):
     pass
 
-
+# Centralized path definition
+BASE_PATH = r"C:\_prog\_code\SEDOS\data-review\2024-07-22"
+REVIEW_PATH = r"C:\_prog\_code\SEDOS\data-review"
 
 # define values to check if/if not in column
 value_in_col = {"type": "1", "year": "2020", "year": "2021"}
@@ -22,7 +25,7 @@ value_not_in_col = {"version": "srd_range_draft", "source": "1"}
 # constants
 
 
-bwshare_path = fr"SEDOS_Modellstruktur.xlsx"
+bwshare_path = fr"C:\_prog\_code\SEDOS\data-review\SEDOS_Modellstruktur.xlsx"
 
 processes_bwshare = pd.read_excel(io=bwshare_path, sheet_name="Process_Set", usecols=["process"])
 processes_bwshare = set(processes_bwshare["process"].dropna())
@@ -36,6 +39,9 @@ parameter_bwshare = pd.read_excel(io=bwshare_path, sheet_name="Parameter_Set",
                                   usecols=["SEDOS_name_long", "static_parameter"])
 nomenclature_static = set(parameter_bwshare.loc[parameter_bwshare["static_parameter"] == 1, "SEDOS_name_long"])
 nomenclature_variable = set(parameter_bwshare.loc[parameter_bwshare["static_parameter"] == 0, "SEDOS_name_long"])
+
+
+
 
 OED_COLS = {
     "id",
@@ -51,9 +57,6 @@ OED_COLS = {
     "timeindex_stop",
     "timeindex_resolution"
 }
-
-# global_tables = [f"{sector}_timeseries", f"{sector}_scalars", "global_timeseries", "global_scalars",
-#                  "global_emission_factors"]
 
 global_emission_cols = [
     "raw_hard_coal_power_stations_industry",
@@ -134,7 +137,8 @@ sector_timeseries_cols = ["capacity_tra_connection_flex_lcar", "capacity_tra_con
                           "exo_pkm_road_lcar", "exo_pkm_road_mcar", "exo_pkm_road_hcar", "sto_max_lcar",
                           "sto_max_mcar", "sto_max_hcar", "sto_min_lcar", "sto_min_mcar", "sto_min_hcar"]
 
-global_cols = global_emission_cols + global_scalar_cols + global_timeseries_cols
+
+
 
 
 def find_wanted_values_in_col(table_name: str, df_table: pd.DataFrame, value_in_col: dict) -> None:
@@ -214,7 +218,7 @@ def get_user_cols(df_table):
     return [col for col in df_table.columns if col not in OED_COLS]
 
 
-def check_global_reference_cols(table_name: str, df_table: object) -> None:
+def check_global_reference_cols(table_name: str, df_table: object, global_cols) -> None:
     '''
     Find foreign-key table references where the referenced column is missing in reference table.
 
@@ -233,7 +237,6 @@ def check_global_reference_cols(table_name: str, df_table: object) -> None:
     miss_ref = pd.DataFrame()
     # extract set of user cols
     user_cols = get_user_cols(df_table)
-
     # New DataFrame with the selected columns
     user_df = df_table[user_cols]
 
@@ -349,51 +352,89 @@ def return_csv_table_paths(path: pathlib.Path) -> list:
     -------
     List of file paths
     '''
-    return glob.glob(f"{path}*.csv")
+    search_path = os.path.join(path, '*.csv')
+    return glob.glob(search_path)
+
+
+
+def read_csv_file(path):
+    try:
+        return pd.read_csv(filepath_or_buffer=path, sep=",")
+    except Exception as e:
+        return None
+
+
+def process_table(table_path, global_cols):
+    table_name = os.path.basename(table_path).split(".")[0]
+    print(table_name)
+    df_table = read_csv_file(table_path)
+    if df_table is None:
+        return {
+            'empty_table': pd.DataFrame([{'table_name': table_name, 'problem': 'empty table'}]),
+            'wrong_col_values': pd.DataFrame(),
+            'missing_ref_table_columns': pd.DataFrame(),
+            'missing_proc': pd.DataFrame(),
+            'wrong_parameter_name': pd.DataFrame()
+        }
+
+    # perform different tests
+    return {
+        'empty_table': pd.DataFrame(),
+        'wrong_col_values': pd.DataFrame(),
+        'missing_ref_table_columns': check_global_reference_cols(table_name, df_table, global_cols),
+        'missing_proc': check_if_process_name_is_in_set_bwshare_process_names(table_name, df_table),
+        'wrong_parameter_name': check_if_column_name_is_in_set_bwshare_parameter_names(table_name, df_table)
+    }
+
+
+def get_global_columns(sector):
+    scalar_path = os.path.join(BASE_PATH, f"{sector}", f"{sector}_scalars.csv")
+    timeseries_path = os.path.join(BASE_PATH, f"{sector}", f"{sector}_timeseries.csv")
+    scalar_table = read_csv_file(scalar_path)
+    timeseries_table = read_csv_file(timeseries_path)
+
+    if scalar_table is None or timeseries_table is None:
+        d = {
+            'table_name': f"{'scalars' if scalar_table is None else ''}{' and ' if scalar_table is None and timeseries_table is None else ''}{'timeseries' if timeseries_table is None else ''}",
+            'problem': 'empty table'
+        }
+        df = pd.DataFrame([d])
+        return global_emission_cols + global_scalar_cols + global_timeseries_cols, df
+
+    sector_timeseries_cols = get_user_cols(timeseries_table)
+    sector_scalar_cols = get_user_cols(scalar_table)
+
+    return global_emission_cols + global_scalar_cols + global_timeseries_cols + sector_scalar_cols + sector_timeseries_cols, None
+
+
+def process_sector(sector):
+    sector_path = os.path.join(BASE_PATH, sector)
+    excel_path = os.path.join(REVIEW_PATH, f"{sector}_review_results.xlsx")
+
+    dfs = {
+        'empty_table': pd.DataFrame(),
+        'wrong_col_values': pd.DataFrame(),
+        'missing_ref_table_columns': pd.DataFrame(),
+        'missing_proc': pd.DataFrame(),
+        'wrong_parameter_name': pd.DataFrame()
+    }
+
+    global_cols, empty_table = get_global_columns(sector)
+    dfs["empty_table"] = pd.concat([dfs["empty_table"], empty_table], ignore_index=True)
+
+    tables_paths = return_csv_table_paths(sector_path)
+
+    for table_path in tables_paths:
+        results = process_table(table_path, global_cols)
+        for key, df in results.items():
+            dfs[key] = pd.concat([dfs[key], df], ignore_index=True)
+
+    with pd.ExcelWriter(excel_path, engine='openpyxl', mode='w') as writer:
+        for sheet_name, df in dfs.items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
 
 
 if __name__ == "__main__":
-
-    sectors = ["pow","hea","x2x","ind","tra"]
-
+    sectors = ["pow", "hea", "x2x", "ind", "tra"]
     for sector in sectors:
-
-        df_wrong_col_values = pd.DataFrame()
-        df_missing_ref_table_columns = pd.DataFrame()
-        df_missing_proc = pd.DataFrame()
-        df_wrong_parameter_name = pd.DataFrame()
-
-        path = fr"2024-06-04/{sector}/"
-        excel_path = fr'review/{sector}_review_results.xlsx'
-        tables_paths = return_csv_table_paths(path)
-
-        for table_path in tables_paths:
-            table_name = table_path.split("\\")[1].split(".")[0]
-            print(table_name)
-            df_table = pd.read_csv(
-                filepath_or_buffer=table_path,
-                sep=",")
-
-            # perform different tests
-
-            #df_wrong_col_values = pd.concat([df_wrong_col_values, find_wanted_values_in_col(table_name, df_table,
-            # value_in_col)], ignore_index=True)
-
-            df_missing_ref_table_columns = pd.concat([df_missing_ref_table_columns, check_global_reference_cols(
-                table_name, df_table)], ignore_index=True)
-
-            df_missing_proc = pd.concat([df_missing_proc, check_if_process_name_is_in_set_bwshare_process_names(
-                table_name, df_table)], ignore_index=True)
-
-            df_wrong_parameter_name = pd.concat(
-                [df_wrong_parameter_name, check_if_column_name_is_in_set_bwshare_parameter_names(
-                    table_name, df_table)], ignore_index=True)
-
-        # save test results to one excel in different sheets
-
-        dfs = {"wrong_values": df_wrong_col_values, "missing_refs": df_missing_ref_table_columns, "missing_processes":
-            df_missing_proc, "wrong_parameter_name": df_wrong_parameter_name}
-
-        for title, df in dfs.items():
-            with pd.ExcelWriter(excel_path, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
-                df.to_excel(writer, sheet_name=title, index=False)
+        process_sector(sector)
