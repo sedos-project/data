@@ -42,7 +42,7 @@ def get_tables():
 
 def get_table_dl_link_datapackage_response(table):
     csv_url = f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{table}/rows?form=csv"
-    json_url = f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{table}/rows?form=datapackage"
+    json_url = f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{table}/meta"
     zip_url = f"https://openenergy-platform.org/api/v0/schema/model_draft/tables/{table}/rows?form=datapackage"
     csv_resp = requests.get(csv_url)
     metadata_resp = requests.get(json_url)
@@ -77,8 +77,8 @@ def download_datapackage(table):
     with open(csv_location, 'wb') as f:
         f.write(csv_resp.content)
 
-    # with open(json_location, 'wb') as f:
-    #     f.write(metadata_resp.content)
+    with open(json_location, 'wb') as f:
+        f.write(metadata_resp.content)
     #
     # with open(zip_location, 'wb') as f:
     #     f.write(zip_resp.content)
@@ -92,7 +92,7 @@ def download_sedos_tables():
     for table in get_tables():
         try:
             download_datapackage(table)
-            print(f"Save: {table}")
+            print(f"Save csv and metadata for: {table}")
             list_tables.append(table)
         except Exception:
             print(f"{table}: Could not be downloaded and saved.")
